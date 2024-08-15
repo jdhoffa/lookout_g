@@ -1,0 +1,12 @@
+[package]
+name = "lookout_g"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+blocking = "1.6.1"
+oauth2 = { version = "4.4.2", features = ["reqwest"] }
+reqwest = { version = "0.12.5", features = ["json"] }
+serde = { version = "1.0.207", features = ["derive"] }
+serde_json = "1.0.125"
+tokio = { version = "1.39.2", features = ["full"] }
