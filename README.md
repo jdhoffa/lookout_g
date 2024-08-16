@@ -33,34 +33,34 @@ cd lookout_g
 - Create OAuth 2.0 credentials and download the credentials.json file.
 - Place credentials.json in the root directory of the project.
 
-### 3. Configure Outlook Calendar URL
-Open the main.rs file and replace the placeholder URL with your Outlook calendar .ics URL:
+### 3. Install Dependencies and Build the Project
 
-rust
-Copy code
-let outlook_calendar_url = "YOUR_OUTLOOK_CALENDAR_ICS_URL";
-
-### 4. Install Dependencies
-Ensure you have the necessary Rust dependencies by adding them to Cargo.toml:
-
-toml
-Copy code
-[dependencies]
-reqwest = { version = "0.11", features = ["json", "blocking"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-oauth2 = { version = "4.0", features = ["reqwest"] }
-tokio = { version = "1", features = ["full"] }
-Then, run:
-
-bash
-Copy code
+```bash
 cargo build
+```
 
-### 5. Run the Project
-bash
-Copy code
-cargo run
+### 4. Run the Project
+You may want to set your ICS URL as an environment variable to avoid entering it every time you run the program. You can do this by adding the following line to your `.bashrc` or `.zshrc` file:
+
+```bash
+export ICS_URL="https://outlook.office.com/owa/calendar/your-calendar-id/Calendar/calendar.ics"
+```
+
+Then run:
+
+  ```bash
+  cargo run -- $ICS_URL
+  ```
+
+(Optional) You can also format the output JSON to be more readable by piping the output to `jq` CLI:
+
+```bash
+cargo run -- $ICS_URL | jq [.]
+```
+
+### 5. (WIP) Set Up Google Calendar Sync
+**Note:** All features that follow are a work in progress.
+
 Follow the on-screen instructions to authenticate with Google and start syncing your Outlook events to Google Calendar.
 
 ## Usage
