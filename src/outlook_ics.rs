@@ -48,7 +48,7 @@ pub fn fetch_and_parse_ics(ics_url: &str) -> Result<Vec<Event>, Box<dyn Error>> 
                         match property.name.as_str() {
                             "SUMMARY" => event.summary = property.value.unwrap_or_default(),
                             "LOCATION" => event.location = property.value,
-                            "DESCRIPTION" => event.description = None, // Don't output description. If you want that: property.value,
+                            "DESCRIPTION" => event.description = property.value,
                             "DTSTART" => event.start.date_time = property.value.unwrap_or_default(),
                             "DTEND" => event.end.date_time = property.value.unwrap_or_default(),
                             _ => {}
