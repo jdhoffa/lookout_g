@@ -63,3 +63,59 @@ pub fn fetch_and_parse_ics(ics_url: &str) -> Result<Vec<Event>, Box<dyn Error>> 
 
     Ok(events)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::error::Error;
+
+    #[test]
+    fn test_fetch_and_parse_ics_success() -> Result<(), Box<dyn Error>> {
+        // Define a mock ICS data
+        let ics_data = "BEGIN:VCALENDAR
+BEGIN:VEVENT
+SUMMARY:Test Event
+LOCATION:Test Location
+DESCRIPTION:Test Description
+DTSTART:20230801T090000Z
+DTEND:20230801T100000Z
+END:VEVENT
+END:VCALENDAR";
+
+        // Create a mock server that returns the ICS data
+        // Request a new server from the pool
+        let mut server = mockito::Server::new();
+
+        // Create a mock
+        let mock = server
+            .mock("GET", "/test.ics")
+            .with_status(200)
+            .with_body(ics_data)
+            .create();
+
+        // Use URL configure your client
+        let url = server.url();
+        let ics_url = format!("{}/test.ics", url);
+        let events = fetch_and_parse_ics(&ics_url)?;
+
+        mock.assert();
+
+        assert_eq!(events.len(), 1);
+
+        let event = &events[0];
+        assert_eq!(event.summary, "Test Event");
+        assert_eq!(event.location.as_deref(), Some("Test Location"));
+        assert_eq!(event.description.as_deref(), Some("Test Description"));
+        assert_eq!(event.start.date_time, "20230801T090000Z");
+        assert_eq!(event.end.date_time, "20230801T100000Z");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_fetch_and_parse_ics_invalid_url() {
+        let invalid_url = "http://invalid-url";
+        let result = fetch_and_parse_ics(invalid_url);
+        assert!(result.is_err());
+    }
+}
