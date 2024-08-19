@@ -4,6 +4,22 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::io::Cursor;
 
+pub struct Config {
+    pub ics_url: String,
+}
+
+impl Config {
+    pub fn build(args: &[String]) -> Result<Config, &'static str> {
+        if args.len() < 2 {
+            return Err("not enough arguments");
+        }
+
+        let ics_url = args[1].clone();
+
+        Ok(Config { ics_url })
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Event {
     pub summary: String,
@@ -62,6 +78,16 @@ pub fn fetch_and_parse_ics(ics_url: &str) -> Result<Vec<Event>, Box<dyn Error>> 
     }
 
     Ok(events)
+}
+
+pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
+    let events = fetch_and_parse_ics(&config.ics_url)?;
+
+    let json_output = serde_json::to_string_pretty(&events)?;
+
+    println!("{json_output}");
+
+    Ok(())
 }
 
 #[cfg(test)]
