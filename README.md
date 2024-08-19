@@ -2,6 +2,8 @@
 
 **lookout_g** is a Rust-based tool that syncs events from your Outlook calendar and pushes them to your Google Calendar. This utility is ideal for users who want to keep their calendars in sync across platforms without manual intervention.
 
+[![Build status](https://github.com/jdhoffa/lookout_g/workflows/ci/badge.svg)](https://github.com/jdhoffa/lookout_g/actions)
+
 ## Features
 
 - Automatically sync events from an Outlook Calendar to a Google Calendar.
