@@ -1,25 +1,17 @@
-use crate::outlook_ics::fetch_and_parse_ics;
-pub mod outlook_ics;
-
+use lookout_g::Config;
 use std::env;
-use std::error::Error;
+use std::process;
 
-fn main() -> Result<(), Box<dyn Error>> {
-    // Get the ICS URL from the command-line arguments
+fn main() {
     let args: Vec<String> = env::args().collect();
-    if args.len() != 2 {
-        eprintln!("Usage: {} $ICS_URL", args[0]);
-        return Err("Invalid number of arguments".into());
+
+    let config = Config::build(&args).unwrap_or_else(|err| {
+        eprintln!("Problem parsing arguments: {err}");
+        process::exit(1);
+    });
+
+    if let Err(e) = lookout_g::run(config) {
+        eprintln!("Application error: {e}");
+        process::exit(1);
     }
-
-    let ics_url = &args[1];
-
-    // Fetch and parse the ICS file
-    let events = fetch_and_parse_ics(ics_url)?;
-
-    // Output the events as JSON
-    let json_output = serde_json::to_string_pretty(&events)?;
-    println!("{}", json_output);
-
-    Ok(())
 }
