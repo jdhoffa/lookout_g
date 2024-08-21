@@ -26,17 +26,64 @@ pub struct OutlookEvent {
     pub summary: String,
     pub location: Option<String>,
     pub description: Option<String>,
-    pub start: EventDateTime,
-    pub end: EventDateTime,
+    pub start: OutlookEventDateTime,
+    pub end: OutlookEventDateTime,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct EventDateTime {
+pub struct OutlookEventDateTime {
     pub date_time: String,
     pub params: Option<Vec<(String, Vec<String>)>>,
 }
 
-pub fn fetch_and_parse_ics(ics_url: &str) -> Result<Vec<OutlookEvent>, Box<dyn Error>> {
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GoogleEvent {
+    pub id: Option<String>,
+    pub summary: Option<String>,
+    pub location: Option<String>,
+    pub description: Option<String>,
+    pub start: GoogleEventDateTime,
+    pub end: GoogleEventDateTime,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GoogleEventDateTime {
+    pub date: Option<String>,
+    pub date_time: Option<String>,
+    pub time_zone: Option<String>,
+}
+
+pub fn outlook_to_google(outlook_event: OutlookEvent) -> GoogleEvent {
+    GoogleEvent {
+        id: outlook_event.id,
+        summary: Some(outlook_event.summary),
+        location: outlook_event.location,
+        description: outlook_event.description,
+        start: convert_event_datetime(outlook_event.start),
+        end: convert_event_datetime(outlook_event.end),
+    }
+}
+
+pub fn convert_event_datetime(event_datetime: OutlookEventDateTime) -> GoogleEventDateTime {
+    // Extract timeZone from params if available
+    let time_zone = event_datetime.params.and_then(|params| {
+        params.iter().find_map(|(key, values)| {
+            if key == "TZID" {
+                values.get(0).cloned()
+            } else {
+                None
+            }
+        })
+    });
+
+    GoogleEventDateTime {
+        date: None, // Not applicable in this conversion, leaving it as None
+        date_time: Some(event_datetime.date_time),
+        time_zone,
+    }
+}
+
+pub fn fetch_and_parse_ics(ics_url: &str) -> Result<Vec<GoogleEvent>, Box<dyn Error>> {
     let response = get(ics_url)?;
     let ics_data = response.bytes()?;
 
@@ -55,11 +102,11 @@ pub fn fetch_and_parse_ics(ics_url: &str) -> Result<Vec<OutlookEvent>, Box<dyn E
                         summary: String::new(),
                         location: None,
                         description: None,
-                        start: EventDateTime {
+                        start: OutlookEventDateTime {
                             date_time: String::new(),
                             params: init_params.clone(),
                         },
-                        end: EventDateTime {
+                        end: OutlookEventDateTime {
                             date_time: String::new(),
                             params: init_params.clone(),
                         },
@@ -81,7 +128,7 @@ pub fn fetch_and_parse_ics(ics_url: &str) -> Result<Vec<OutlookEvent>, Box<dyn E
                             _ => {}
                         }
                     }
-                    events.push(event);
+                    events.push(outlook_to_google(event));
                 }
             }
             Err(e) => eprintln!("Error parsing calendar: {:?}", e),
