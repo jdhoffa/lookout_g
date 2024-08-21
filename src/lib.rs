@@ -65,6 +65,17 @@ pub fn outlook_to_google(outlook_event: OutlookEvent) -> GoogleEvent {
 }
 
 pub fn convert_event_datetime(event_datetime: OutlookEventDateTime) -> GoogleEventDateTime {
+    fn date_time_to_google_date(date_str: &str) -> Option<String> {
+        if date_str.len() >= 8 {
+            let year = &date_str[0..4];
+            let month = &date_str[4..6];
+            let day = &date_str[6..8];
+            Some(format!("{}-{}-{}", year, month, day))
+        } else {
+            None
+        }
+    }
+
     // Extract timeZone from params if available
     let time_zone = event_datetime.params.and_then(|params| {
         params.iter().find_map(|(key, values)| {
@@ -77,7 +88,7 @@ pub fn convert_event_datetime(event_datetime: OutlookEventDateTime) -> GoogleEve
     });
 
     GoogleEventDateTime {
-        date: None, // Not applicable in this conversion, leaving it as None
+        date: date_time_to_google_date(&event_datetime.date_time),
         date_time: Some(event_datetime.date_time),
         time_zone,
     }
