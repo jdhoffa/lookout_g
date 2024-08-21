@@ -62,7 +62,6 @@ pub fn fetch_and_parse_ics(ics_url: &str) -> Result<Vec<Event>, Box<dyn Error>> 
                         },
                     };
                     for property in ical_event.properties {
-                        println!("{:?}", property);
                         match property.name.as_str() {
                             "SUMMARY" => event.summary = property.value.unwrap_or_default(),
                             "LOCATION" => event.location = property.value,
