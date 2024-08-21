@@ -21,7 +21,7 @@ impl Config {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Event {
+pub struct OutlookEvent {
     pub id: Option<String>,
     pub summary: String,
     pub location: Option<String>,
@@ -36,7 +36,7 @@ pub struct EventDateTime {
     pub params: Option<Vec<(String, Vec<String>)>>,
 }
 
-pub fn fetch_and_parse_ics(ics_url: &str) -> Result<Vec<Event>, Box<dyn Error>> {
+pub fn fetch_and_parse_ics(ics_url: &str) -> Result<Vec<OutlookEvent>, Box<dyn Error>> {
     let response = get(ics_url)?;
     let ics_data = response.bytes()?;
 
@@ -50,7 +50,7 @@ pub fn fetch_and_parse_ics(ics_url: &str) -> Result<Vec<Event>, Box<dyn Error>> 
                 for ical_event in calendar.events {
                     let init_params: Option<Vec<(String, Vec<String>)>> = Some(Vec::new());
 
-                    let mut event = Event {
+                    let mut event = OutlookEvent {
                         id: None,
                         summary: String::new(),
                         location: None,
