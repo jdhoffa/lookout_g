@@ -9,12 +9,13 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn build(args: &[String]) -> Result<Config, &'static str> {
-        if args.len() < 2 {
-            return Err("not enough arguments");
-        }
+    pub fn build(mut args: impl Iterator<Item = String>) -> Result<Config, &'static str> {
+        args.next();
 
-        let ics_url = args[1].clone();
+        let ics_url = match args.next() {
+            Some(arg) => arg,
+            None => return Err("Didn't get an ICS URL string"),
+        };
 
         Ok(Config { ics_url })
     }
@@ -61,6 +62,7 @@ pub fn fetch_and_parse_ics(ics_url: &str) -> Result<Vec<Event>, Box<dyn Error>> 
                         },
                     };
                     for property in ical_event.properties {
+                        println!("{:?}", property);
                         match property.name.as_str() {
                             "SUMMARY" => event.summary = property.value.unwrap_or_default(),
                             "LOCATION" => event.location = property.value,
