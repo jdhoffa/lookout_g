@@ -9,12 +9,13 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn build(args: &[String]) -> Result<Config, &'static str> {
-        if args.len() < 2 {
-            return Err("not enough arguments");
-        }
+    pub fn build(mut args: impl Iterator<Item = String>) -> Result<Config, &'static str> {
+        args.next();
 
-        let ics_url = args[1].clone();
+        let ics_url = match args.next() {
+            Some(arg) => arg,
+            None => return Err("Didn't get an ICS URL string"),
+        };
 
         Ok(Config { ics_url })
     }
