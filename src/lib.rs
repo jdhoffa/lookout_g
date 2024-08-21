@@ -33,7 +33,7 @@ pub struct Event {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EventDateTime {
     pub date_time: String,
-    pub time_zone: String,
+    pub params: Option<Vec<(String, Vec<String>)>>,
 }
 
 pub fn fetch_and_parse_ics(ics_url: &str) -> Result<Vec<Event>, Box<dyn Error>> {
@@ -48,6 +48,8 @@ pub fn fetch_and_parse_ics(ics_url: &str) -> Result<Vec<Event>, Box<dyn Error>> 
         match calendar {
             Ok(calendar) => {
                 for ical_event in calendar.events {
+                    let init_params: Option<Vec<(String, Vec<String>)>> = Some(Vec::new());
+
                     let mut event = Event {
                         id: None,
                         summary: String::new(),
@@ -55,11 +57,11 @@ pub fn fetch_and_parse_ics(ics_url: &str) -> Result<Vec<Event>, Box<dyn Error>> 
                         description: None,
                         start: EventDateTime {
                             date_time: String::new(),
-                            time_zone: "UTC".to_string(),
+                            params: init_params.clone(),
                         },
                         end: EventDateTime {
                             date_time: String::new(),
-                            time_zone: "UTC".to_string(),
+                            params: init_params.clone(),
                         },
                     };
                     for property in ical_event.properties {
@@ -68,8 +70,14 @@ pub fn fetch_and_parse_ics(ics_url: &str) -> Result<Vec<Event>, Box<dyn Error>> 
                             "SUMMARY" => event.summary = property.value.unwrap_or_default(),
                             "LOCATION" => event.location = property.value,
                             "DESCRIPTION" => event.description = property.value,
-                            "DTSTART" => event.start.date_time = property.value.unwrap_or_default(),
-                            "DTEND" => event.end.date_time = property.value.unwrap_or_default(),
+                            "DTSTART" => {
+                                event.start.date_time = property.value.unwrap_or_default();
+                                event.start.params = property.params.clone();
+                            }
+                            "DTEND" => {
+                                event.end.date_time = property.value.unwrap_or_default();
+                                event.end.params = property.params.clone();
+                            }
                             _ => {}
                         }
                     }
