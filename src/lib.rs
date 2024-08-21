@@ -1,3 +1,4 @@
+use chrono::{DateTime, NaiveDateTime, Utc};
 use ical::IcalParser;
 use reqwest::blocking::get;
 use serde::{Deserialize, Serialize};
@@ -76,6 +77,17 @@ pub fn convert_event_datetime(event_datetime: OutlookEventDateTime) -> GoogleEve
         }
     }
 
+    fn date_time_to_rfc3339(date_str: &str) -> Option<String> {
+        if date_str.len() >= 15 {
+            let naive_date_time = NaiveDateTime::parse_from_str(date_str, "%Y%m%dT%H%M%S").ok()?;
+            let date_time: DateTime<Utc> =
+                DateTime::from_naive_utc_and_offset(naive_date_time, Utc);
+            Some(date_time.to_rfc3339())
+        } else {
+            None
+        }
+    }
+
     // Extract timeZone from params if available
     let time_zone = event_datetime.params.and_then(|params| {
         params.iter().find_map(|(key, values)| {
@@ -89,7 +101,7 @@ pub fn convert_event_datetime(event_datetime: OutlookEventDateTime) -> GoogleEve
 
     GoogleEventDateTime {
         date: date_time_to_google_date(&event_datetime.date_time),
-        date_time: Some(event_datetime.date_time),
+        date_time: date_time_to_rfc3339(&event_datetime.date_time),
         time_zone,
     }
 }

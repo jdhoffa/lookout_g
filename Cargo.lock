@@ -779,6 +779,7 @@ name = "lookout_g"
 version = "0.1.0"
 dependencies = [
  "blocking",
+ "chrono",
  "ical",
  "mockito",
  "oauth2",
