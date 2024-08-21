@@ -22,6 +22,7 @@ impl Config {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Event {
+    pub id: Option<String>,
     pub summary: String,
     pub location: Option<String>,
     pub description: Option<String>,
@@ -48,6 +49,7 @@ pub fn fetch_and_parse_ics(ics_url: &str) -> Result<Vec<Event>, Box<dyn Error>> 
             Ok(calendar) => {
                 for ical_event in calendar.events {
                     let mut event = Event {
+                        id: None,
                         summary: String::new(),
                         location: None,
                         description: None,
@@ -62,6 +64,7 @@ pub fn fetch_and_parse_ics(ics_url: &str) -> Result<Vec<Event>, Box<dyn Error>> 
                     };
                     for property in ical_event.properties {
                         match property.name.as_str() {
+                            "UID" => event.id = property.value,
                             "SUMMARY" => event.summary = property.value.unwrap_or_default(),
                             "LOCATION" => event.location = property.value,
                             "DESCRIPTION" => event.description = property.value,
