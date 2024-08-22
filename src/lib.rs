@@ -205,8 +205,8 @@ BEGIN:VEVENT
 SUMMARY:Test Event
 LOCATION:Test Location
 DESCRIPTION:Test Description
-DTSTART:20230801T090000Z
-DTEND:20230801T100000Z
+DTSTART;TZID=Romance Standard Time:20230801T090000
+DTEND;TZID=Romance Standard Time:20230801T100000
 END:VEVENT
 END:VCALENDAR";
 
@@ -231,11 +231,19 @@ END:VCALENDAR";
         assert_eq!(events.len(), 1);
 
         let event = &events[0];
-        assert_eq!(event.summary, "Test Event");
+        assert_eq!(event.summary, Some(String::from("Test Event")));
         assert_eq!(event.location.as_deref(), Some("Test Location"));
         assert_eq!(event.description.as_deref(), Some("Test Description"));
-        assert_eq!(event.start.date_time, "20230801T090000Z");
-        assert_eq!(event.end.date_time, "20230801T100000Z");
+        assert_eq!(
+            event.start.date_time,
+            Some(String::from("2023-08-01T09:00:00+00:00"))
+        );
+        assert_eq!(
+            event.end.date_time,
+            Some(String::from("2023-08-01T10:00:00+00:00"))
+        );
+        assert_eq!(event.start.time_zone, Some(String::from("Europe/Paris")));
+        assert_eq!(event.end.time_zone, Some(String::from("Europe/Paris")));
 
         Ok(())
     }
