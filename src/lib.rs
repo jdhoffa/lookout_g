@@ -1,4 +1,5 @@
 use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono_tz::Tz;
 use ical::IcalParser;
 use reqwest::blocking::get;
 use serde::{Deserialize, Serialize};
@@ -85,6 +86,41 @@ pub fn convert_event_datetime(event_datetime: OutlookEventDateTime) -> GoogleEve
             Some(date_time.to_rfc3339())
         } else {
             None
+        }
+    }
+
+    fn map_timezone_name(tz_name: &str) -> Option<Tz> {
+        match tz_name {
+            "Central America Standard Time" => Some(Tz::America__Guatemala),
+            "Central Europe Standard Time" => Some(Tz::Europe__Berlin), // Central European Time (CET)
+            "Central Standard Time" => Some(Tz::America__Chicago), // Central Standard Time (CST) in the US
+            "Eastern Standard Time" => Some(Tz::America__New_York), // Eastern Standard Time (EST) in the US
+            "GMT Standard Time" => Some(Tz::Europe__London), // Greenwich Mean Time, used in the UK (not during daylight saving time)
+            "Greenwich Standard Time" => Some(Tz::Etc__GMT), // Pure GMT without daylight saving adjustments
+            "Mountain Standard Time" => Some(Tz::America__Denver), // Mountain Standard Time (MST) in the US
+            "Pacific Standard Time" => Some(Tz::America__Los_Angeles), // Pacific Standard Time (PST) in the US
+            "Romance Standard Time" => Some(Tz::Europe__Paris), // Romance Standard Time, used in Western Europe (e.g., France, Belgium)
+            "SA Pacific Standard Time" => Some(Tz::America__Bogota), // South America Pacific Standard Time (e.g., Colombia)
+            "US Mountain Standard Time" => Some(Tz::America__Phoenix), // MST without daylight saving in the US (e.g., Arizona)
+            "UTC" => Some(Tz::UTC),                                    // Coordinated Universal Time
+            "W. Europe Standard Time" => Some(Tz::Europe__Berlin), // Western Europe Standard Time (e.g., Germany, Netherlands)
+            _ => None,
+        }
+    }
+
+    fn convert_to_utc(
+        event_start: &str,
+        tz_name: &str,
+    ) -> Result<DateTime<Utc>, Box<dyn std::error::Error>> {
+        if let Some(tz) = map_timezone_name(tz_name) {
+            let naive_time = NaiveDateTime::parse_from_str(event_start, "%Y%m%dT%H%M%S")?;
+            let local_time = tz
+                .from_local_datetime(&naive_time)
+                .earliest()
+                .ok_or("Invalid time")?;
+            Ok(local_time.with_timezone(&Utc))
+        } else {
+            Err("Unknown time zone".into())
         }
     }
 
