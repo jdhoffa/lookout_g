@@ -8,6 +8,8 @@ use std::io::Cursor;
 
 pub struct Config {
     pub ics_url: String,
+    pub google_calendar_name: String,
+    pub google_credentials_path: String,
 }
 
 impl Config {
@@ -19,7 +21,21 @@ impl Config {
             None => return Err("Didn't get an ICS URL string"),
         };
 
-        Ok(Config { ics_url })
+        let google_calendar_name = match args.next() {
+            Some(arg) => arg,
+            None => String::from("Test"),
+        };
+
+        let google_credentials_path = match args.next() {
+            Some(arg) => arg,
+            None => String::from("credentials.json"),
+        };
+
+        Ok(Config {
+            ics_url,
+            google_calendar_name,
+            google_credentials_path,
+        })
     }
 }
 
