@@ -108,22 +108,6 @@ pub fn convert_event_datetime(event_datetime: OutlookEventDateTime) -> GoogleEve
         }
     }
 
-    fn convert_to_utc(
-        event_start: &str,
-        tz_name: &str,
-    ) -> Result<DateTime<Utc>, Box<dyn std::error::Error>> {
-        if let Some(tz) = map_timezone_name(tz_name) {
-            let naive_time = NaiveDateTime::parse_from_str(event_start, "%Y%m%dT%H%M%S")?;
-            let local_time = tz
-                .from_local_datetime(&naive_time)
-                .earliest()
-                .ok_or("Invalid time")?;
-            Ok(local_time.with_timezone(&Utc))
-        } else {
-            Err("Unknown time zone".into())
-        }
-    }
-
     // Extract timeZone from params if available
     let time_zone = event_datetime.params.and_then(|params| {
         params.iter().find_map(|(key, values)| {
@@ -138,7 +122,8 @@ pub fn convert_event_datetime(event_datetime: OutlookEventDateTime) -> GoogleEve
     GoogleEventDateTime {
         date: date_time_to_google_date(&event_datetime.date_time),
         date_time: date_time_to_rfc3339(&event_datetime.date_time),
-        time_zone,
+        time_zone: time_zone
+            .and_then(|tz_name| map_timezone_name(&tz_name).map(|tz| tz.name().to_string())),
     }
 }
 
