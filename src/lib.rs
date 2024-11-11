@@ -1,8 +1,11 @@
 use chrono::{DateTime, NaiveDateTime, Utc};
 use chrono_tz::Tz;
+use google_calendar3::api::{Event, EventDateTime};
+use google_calendar3::{hyper, hyper_rustls, oauth2, CalendarHub};
+use hyper::client::HttpConnector;
+use hyper_rustls::HttpsConnector;
 use ical::IcalParser;
-use reqwest::blocking::get;
-use serde::{Deserialize, Serialize};
+use reqwest::Client;
 use std::error::Error;
 use std::io::Cursor;
 
@@ -39,7 +42,6 @@ impl Config {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
 pub struct OutlookEvent {
     pub id: Option<String>,
     pub summary: String,
@@ -49,58 +51,30 @@ pub struct OutlookEvent {
     pub end: OutlookEventDateTime,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
 pub struct OutlookEventDateTime {
     pub date_time: String,
     pub params: Option<Vec<(String, Vec<String>)>>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct GoogleEvent {
-    pub id: Option<String>,
-    pub summary: Option<String>,
-    pub location: Option<String>,
-    pub description: Option<String>,
-    pub start: GoogleEventDateTime,
-    pub end: GoogleEventDateTime,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct GoogleEventDateTime {
-    pub date: Option<String>,
-    pub date_time: Option<String>,
-    pub time_zone: Option<String>,
-}
-
-pub fn outlook_to_google(outlook_event: OutlookEvent) -> GoogleEvent {
-    GoogleEvent {
-        id: outlook_event.id,
+pub fn outlook_to_google(outlook_event: OutlookEvent) -> Event {
+    Event {
+        //id: outlook_event.id,
         summary: Some(outlook_event.summary),
         location: outlook_event.location,
         description: outlook_event.description,
-        start: convert_event_datetime(outlook_event.start),
-        end: convert_event_datetime(outlook_event.end),
+        start: Some(convert_event_datetime(outlook_event.start)),
+        end: Some(convert_event_datetime(outlook_event.end)),
+        ..Default::default()
     }
 }
 
-pub fn convert_event_datetime(event_datetime: OutlookEventDateTime) -> GoogleEventDateTime {
-    fn date_time_to_google_date(date_str: &str) -> Option<String> {
-        if date_str.len() >= 8 {
-            let year = &date_str[0..4];
-            let month = &date_str[4..6];
-            let day = &date_str[6..8];
-            Some(format!("{}-{}-{}", year, month, day))
-        } else {
-            None
-        }
-    }
-
-    fn date_time_to_rfc3339(date_str: &str) -> Option<String> {
+pub fn convert_event_datetime(event_datetime: OutlookEventDateTime) -> EventDateTime {
+    fn date_time_to_naive(date_str: &str) -> Option<DateTime<Utc>> {
         if date_str.len() >= 15 {
             let naive_date_time = NaiveDateTime::parse_from_str(date_str, "%Y%m%dT%H%M%S").ok()?;
             let date_time: DateTime<Utc> =
                 DateTime::from_naive_utc_and_offset(naive_date_time, Utc);
-            Some(date_time.to_rfc3339())
+            Some(date_time)
         } else {
             None
         }
@@ -136,17 +110,23 @@ pub fn convert_event_datetime(event_datetime: OutlookEventDateTime) -> GoogleEve
         })
     });
 
-    GoogleEventDateTime {
-        date: date_time_to_google_date(&event_datetime.date_time),
-        date_time: date_time_to_rfc3339(&event_datetime.date_time),
+    EventDateTime {
+        date_time: date_time_to_naive(&event_datetime.date_time),
         time_zone: time_zone
             .and_then(|tz_name| map_timezone_name(&tz_name).map(|tz| tz.name().to_string())),
+        ..Default::default()
     }
 }
 
-pub fn fetch_and_parse_ics(ics_url: &str) -> Result<Vec<GoogleEvent>, Box<dyn Error>> {
-    let response = get(ics_url)?;
-    let ics_data = response.bytes()?;
+async fn fetch_and_parse_ics(ics_url: &str) -> Result<Vec<Event>, Box<dyn Error>> {
+    let client = Client::new();
+    let response = client
+        .get(ics_url)
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    let ics_data = response.bytes().await?;
 
     let mut events = Vec::new();
     let reader = Cursor::new(ics_data);
@@ -203,10 +183,78 @@ pub fn fetch_and_parse_ics(ics_url: &str) -> Result<Vec<GoogleEvent>, Box<dyn Er
     Ok(events)
 }
 
-pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
-    let events = fetch_and_parse_ics(&config.ics_url)?;
+async fn create_hub() -> CalendarHub<HttpsConnector<HttpConnector>> {
+    // Load OAuth2 credentials from the `credentials.json` file
+    let secret = oauth2::read_application_secret("credentials.json")
+        .await
+        .expect("Failed to read client secret");
 
-    let json_output = serde_json::to_string_pretty(&events)?;
+    // Create an authenticator
+    let auth = oauth2::InstalledFlowAuthenticator::builder(
+        secret,
+        oauth2::InstalledFlowReturnMethod::HTTPRedirect,
+    )
+    .persist_tokens_to_disk("tokencache.json")
+    .build()
+    .await
+    .expect("Failed to create authenticator");
+
+    // Set up the Google Calendar API hub
+    let hub = CalendarHub::new(
+        hyper::Client::builder().build(
+            hyper_rustls::HttpsConnectorBuilder::new()
+                .with_native_roots()
+                .unwrap()
+                .https_or_http()
+                .enable_http1()
+                .build(),
+        ),
+        auth,
+    );
+
+    hub
+}
+
+pub async fn run(config: Config) -> Result<(), Box<dyn Error>> {
+    let events = fetch_and_parse_ics(&config.ics_url).await?;
+    let hub = create_hub().await;
+
+    // Retrieve the list of calendars
+    let calendars = hub
+        .calendar_list()
+        .list()
+        .doit()
+        .await
+        .expect("Failed to list calendars");
+
+    // Find the calendar with the summary "Test"
+    let test_calendar_id = calendars
+        .1
+        .items
+        .unwrap_or_default()
+        .into_iter()
+        .find(|cal| cal.summary.as_deref() == Some("Test"))
+        .expect("Test calendar not found")
+        .id
+        .expect("Test calendar has no ID");
+
+    // Insert the event into the calendar
+    let result = hub
+        .events()
+        .insert(events[1].clone(), &test_calendar_id)
+        .doit()
+        .await;
+
+    match result {
+        Ok((_, event)) => {
+            println!("Event created: {:?}", event.html_link);
+        }
+        Err(e) => {
+            println!("Error creating event: {:?}", e);
+        }
+    }
+
+    let json_output = serde_json::to_string_pretty(&events[1])?;
 
     println!("{json_output}");
 
