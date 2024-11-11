@@ -189,7 +189,11 @@ pub fn fetch_and_parse_ics(ics_url: &str) -> Result<Vec<GoogleEvent>, Box<dyn Er
                             _ => {}
                         }
                     }
-                    events.push(outlook_to_google(event));
+                    if event.start.date_time
+                        >= chrono::Local::now().format("%Y%m%dT%H%M%S").to_string()
+                    {
+                        events.push(outlook_to_google(event));
+                    }
                 }
             }
             Err(e) => eprintln!("Error parsing calendar: {:?}", e),
