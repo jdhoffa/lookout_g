@@ -3,7 +3,7 @@
 lookout_g is a tool to sync events from an Outlook Calendar to a Google Calendar. It uses the Google Calendar API and OAuth2 for secure access to your Google Calendar. The tool can be run manually or set up as a cron job for automatic synchronization.
 
 [![Rust](https://github.com/jdhoffa/lookout_g/actions/workflows/ci.yml/badge.svg)](https://github.com/jdhoffa/lookout_g/actions/workflows/ci.yml)
-[![MIT License](https://img.shields.io/github/license/jdhoffa/lookout_g)]
+[![MIT License](https://img.shields.io/github/license/jdhoffa/lookout_g)](https://github.com/jdhoffa/lookout_g/LICENSE.md)
 ## Prerequisites
 
 Before you begin, ensure you:
