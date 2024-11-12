@@ -379,6 +379,8 @@ END:VCALENDAR",
             .await
             .expect("Failed to fetch and parse ICS");
 
+        dbg!(&events);
+
         // Ensure the mock server was called as expected
         mock.assert();
 
