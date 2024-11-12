@@ -171,16 +171,15 @@ async fn fetch_and_parse_ics(ics_url: &str) -> Result<Vec<Event>, Box<dyn Error>
                     }
 
                     let google_event = outlook_to_google(event);
-                    let this_date = google_event
-                        .start
-                        .clone()
-                        .unwrap()
-                        .date_time
-                        .unwrap()
-                        .date_naive();
 
-                    if this_date >= chrono::Utc::now().date_naive() {
-                        events.push(google_event);
+                    if let Some(this_date_time) = google_event.start.clone().unwrap().date_time {
+                        let this_date = this_date_time.date_naive();
+                        if this_date >= Utc::now().date_naive() {
+                            events.push(google_event);
+                        }
+                    } else {
+                        println!("Event does not have a start date");
+                        continue;
                     }
                 }
             }
