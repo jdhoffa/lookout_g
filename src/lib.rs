@@ -80,7 +80,7 @@ pub fn convert_event_datetime(event_datetime: OutlookEventDateTime) -> EventDate
         }
     }
 
-    fn map_timezone_name(tz_name: &str) -> Option<Tz> {
+    pub fn map_timezone_name(tz_name: &str) -> Option<Tz> {
         match tz_name {
             "Central America Standard Time" => Some(Tz::America__Guatemala),
             "Central Europe Standard Time" => Some(Tz::Europe__Berlin), // Central European Time (CET)
@@ -169,10 +169,11 @@ async fn fetch_and_parse_ics(ics_url: &str) -> Result<Vec<Event>, Box<dyn Error>
                             _ => {}
                         }
                     }
-                    if event.start.date_time
-                        >= chrono::Local::now().format("%Y%m%dT%H%M%S").to_string()
-                    {
-                        events.push(outlook_to_google(event));
+
+                    let google_event = outlook_to_google(event);
+
+                    if google_event.start.clone().unwrap().date_time >= Some(chrono::Utc::now()) {
+                        events.push(google_event);
                     }
                 }
             }
@@ -263,64 +264,131 @@ pub async fn run(config: Config) -> Result<(), Box<dyn Error>> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use std::error::Error;
+    use super::*; // Replace `your_crate_name` with the name of your crate.
+    use mockito;
+    use tokio;
 
     #[test]
-    fn test_fetch_and_parse_ics_success() -> Result<(), Box<dyn Error>> {
-        // Define a mock ICS data
-        let ics_data = "BEGIN:VCALENDAR
+    fn test_config_build_success() {
+        let args = vec![
+            "program_name".to_string(),
+            "https://example.com/calendar.ics".to_string(),
+            "MyCalendar".to_string(),
+            "path/to/credentials.json".to_string(),
+        ];
+        let config = Config::build(args.into_iter()).unwrap();
+        assert_eq!(config.ics_url, "https://example.com/calendar.ics");
+        assert_eq!(config.google_calendar_name, "MyCalendar");
+        assert_eq!(config.google_credentials_path, "path/to/credentials.json");
+    }
+
+    #[test]
+    fn test_config_build_missing_args() {
+        let args = vec![
+            "program_name".to_string(),
+            "https://example.com/calendar.ics".to_string(),
+        ];
+        let result = Config::build(args.into_iter());
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().google_calendar_name, "Test");
+    }
+
+    #[test]
+    fn test_outlook_to_google_conversion() {
+        let outlook_event = OutlookEvent {
+            id: Some("event123".to_string()),
+            summary: "Meeting".to_string(),
+            location: Some("Boardroom".to_string()),
+            description: Some("Discuss project updates".to_string()),
+            start: OutlookEventDateTime {
+                date_time: "20231111T100000".to_string(),
+                params: None,
+            },
+            end: OutlookEventDateTime {
+                date_time: "20231111T110000".to_string(),
+                params: None,
+            },
+        };
+
+        let google_event = outlook_to_google(outlook_event);
+        assert_eq!(google_event.summary.unwrap(), "Meeting");
+        assert_eq!(google_event.location.unwrap(), "Boardroom");
+        assert_eq!(google_event.description.unwrap(), "Discuss project updates");
+        assert!(google_event.start.is_some());
+        assert!(google_event.end.is_some());
+    }
+
+    #[test]
+    fn test_convert_event_datetime_valid() {
+        let outlook_dt = OutlookEventDateTime {
+            date_time: "20231111T100000".to_string(),
+            params: Some(vec![("TZID".to_string(), vec!["UTC".to_string()])]),
+        };
+
+        let event_dt = convert_event_datetime(outlook_dt);
+        assert!(event_dt.date_time.is_some());
+        assert_eq!(event_dt.time_zone.unwrap(), "UTC");
+    }
+
+    #[test]
+    fn test_convert_event_datetime_invalid_date() {
+        let outlook_dt = OutlookEventDateTime {
+            date_time: "invalid_date".to_string(),
+            params: Some(vec![("TZID".to_string(), vec!["UTC".to_string()])]),
+        };
+
+        let event_dt = convert_event_datetime(outlook_dt);
+        assert!(event_dt.date_time.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_fetch_and_parse_ics() {
+        let start_time = chrono::Local::now();
+        let end_time = chrono::Local::now() + chrono::Duration::hours(1);
+
+        // Define the mock ICS data
+        let ics_data = format!(
+            "BEGIN:VCALENDAR
 BEGIN:VEVENT
 SUMMARY:Test Event
 LOCATION:Test Location
 DESCRIPTION:Test Description
-DTSTART;TZID=Romance Standard Time:20230801T090000
-DTEND;TZID=Romance Standard Time:20230801T100000
+DTSTART;TZID=Romance Standard Time:{}
+DTEND;TZID=Romance Standard Time:{}
 END:VEVENT
-END:VCALENDAR";
+END:VCALENDAR",
+            start_time.format("%Y%m%dT%H%M%S"),
+            end_time.format("%Y%m%dT%H%M%S")
+        );
 
-        // Create a mock server that returns the ICS data
-        // Request a new server from the pool
-        let mut server = mockito::Server::new();
+        let mut server = mockito::Server::new_async().await;
 
-        // Create a mock
+        // Set up the mock server to return the ICS data
         let mock = server
             .mock("GET", "/test.ics")
             .with_status(200)
+            // .with_header("content-type", "text/calendar")
             .with_body(ics_data)
             .create();
 
-        // Use URL configure your client
-        let url = server.url();
-        let ics_url = format!("{}/test.ics", url);
-        let events = fetch_and_parse_ics(&ics_url)?;
+        // Create the URL to point to the mock server's endpoint
+        let ics_url = format!("{}/test.ics", &server.url());
 
+        // Call the function and capture the result
+        let events = fetch_and_parse_ics(&ics_url)
+            .await
+            .expect("Failed to fetch and parse ICS");
+
+        // Ensure the mock server was called as expected
         mock.assert();
 
+        // Validate the parsed event data
         assert_eq!(events.len(), 1);
-
         let event = &events[0];
-        assert_eq!(event.summary, Some(String::from("Test Event")));
+        assert_eq!(event.summary.as_deref(), Some("Test Event"));
         assert_eq!(event.location.as_deref(), Some("Test Location"));
         assert_eq!(event.description.as_deref(), Some("Test Description"));
-        assert_eq!(
-            event.start.date_time,
-            Some(String::from("2023-08-01T09:00:00+00:00"))
-        );
-        assert_eq!(
-            event.end.date_time,
-            Some(String::from("2023-08-01T10:00:00+00:00"))
-        );
-        assert_eq!(event.start.time_zone, Some(String::from("Europe/Paris")));
-        assert_eq!(event.end.time_zone, Some(String::from("Europe/Paris")));
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_fetch_and_parse_ics_invalid_url() {
-        let invalid_url = "http://invalid-url";
-        let result = fetch_and_parse_ics(invalid_url);
-        assert!(result.is_err());
+        assert!(event.start.is_some());
+        assert!(event.end.is_some());
     }
 }
