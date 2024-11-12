@@ -171,10 +171,15 @@ async fn fetch_and_parse_ics(ics_url: &str) -> Result<Vec<Event>, Box<dyn Error>
                     }
 
                     let google_event = outlook_to_google(event);
+                    let this_date = google_event
+                        .start
+                        .clone()
+                        .unwrap()
+                        .date_time
+                        .unwrap()
+                        .date_naive();
 
-                    if dbg!(
-                        google_event.start.clone().unwrap().date_time >= Some(chrono::Utc::now())
-                    ) {
+                    if this_date >= chrono::Utc::now().date_naive() {
                         events.push(google_event);
                     }
                 }
