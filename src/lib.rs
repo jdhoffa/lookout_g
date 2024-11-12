@@ -245,25 +245,22 @@ pub async fn run(config: Config) -> Result<(), Box<dyn Error>> {
         .id
         .expect("Test calendar has no ID");
 
-    // Insert the event into the calendar
-    let result = hub
-        .events()
-        .insert(events[1].clone(), &test_calendar_id)
-        .doit()
-        .await;
-
-    match result {
-        Ok((_, event)) => {
-            println!("Event created: {:?}", event.html_link);
-        }
-        Err(e) => {
-            println!("Error creating event: {:?}", e);
+    // Insert all events into the calendar
+    for event in &events {
+        let result = hub
+            .events()
+            .insert(event.clone(), &test_calendar_id)
+            .doit()
+            .await;
+        match result {
+            Ok((_, event)) => {
+                println!("Event created: {:?}", event.html_link);
+            }
+            Err(e) => {
+                println!("Error creating event: {:?}", e);
+            }
         }
     }
-
-    let json_output = serde_json::to_string_pretty(&events[1])?;
-
-    println!("{json_output}");
 
     Ok(())
 }
